@@ -20,6 +20,8 @@ from transformers.generation.stopping_criteria import (
     StoppingCriteriaList,
     StopStringCriteria,
 )
+from transformers import Qwen2VLForConditionalGeneration
+
 
 
 class DTrOCRModel(nn.Module):
@@ -27,13 +29,15 @@ class DTrOCRModel(nn.Module):
         super().__init__()
         # embeddings
         # Load Qwen2.5-VL model and extract its vision encoder
-        qwen_vl_model = AutoModelForVision2Seq.from_pretrained(
+        qwen_vl_model = Qwen2VLForConditionalGeneration.from_pretrained(
             config.qwen_vl_hf_model,
+            # cache_dir=config.cache_dir,
             trust_remote_code=True
         )
-        self.patch_embeddings = qwen_vl_model.vision_model  # Qwen2.5-VL’s ViT encoder
-        for param in self.patch_embeddings.parameters():
-            param.requires_grad = False
+        # Access the vision encoder using `model.encoder.vision_model`
+        self.patch_embeddings = qwen_vl_model.model.encoder.vision_model
+
+
         self.vision_projection = nn.Linear(1280, config.hidden_size)  # Project Qwen2.5-VL output to GPT-2 hidden size
         self.token_embedding = nn.Embedding(config.vocab_size, config.hidden_size)
         self.positional_embedding = nn.Embedding(config.max_position_embeddings, config.hidden_size)
