@@ -1,4 +1,4 @@
-from transformers import GPT2Tokenizer, AutoImageProcessor
+from transformers import GPT2Tokenizer, AutoProcessor
 
 from PIL import Image
 from typing import List, Union
@@ -8,13 +8,10 @@ from data import DTrOCRProcessorOutput
 
 class DTrOCRProcessor:
     def __init__(self, config: DTrOCRConfig, add_bos_token: bool = False, add_eos_token: bool = False):
-        self.vit_processor = AutoImageProcessor.from_pretrained(
-            config.vit_hf_model,
-            size={
-                "height": config.image_size[0],
-                'width': config.image_size[1]
-            },
-            use_fast=True
+        # Use Qwen2.5-VL’s processor for image preprocessing
+        self.vl_processor = AutoProcessor.from_pretrained(
+            config.qwen_vl_hf_model,
+            trust_remote_code=True  # Required for Qwen2.5-VL
         )
         self.tokeniser = GPT2Tokenizer.from_pretrained(
             config.gpt2_hf_model,
@@ -45,12 +42,23 @@ class DTrOCRProcessor:
             texts, padding=padding, *args, **kwargs
         ) if texts is not None else None
 
-        image_inputs = self.vit_processor(
-            images, input_data_format=input_data_format, *args, **kwargs
-        ) if images is not None else None
+        # Use Qwen2.5-VL processor for images
+        if images is not None:
+            # Qwen2.5-VL expects a list of images or a single image
+            if not isinstance(images, list):
+                images = [images]
+            # Process images with Qwen2.5-VL’s processor
+            image_inputs = self.vl_processor(
+                images=images,
+                return_tensors='pt',
+                size={"height": 448, "width": 448}  # Match Qwen2.5-VL default
+            )
+            pixel_values = image_inputs['pixel_values']
+        else:
+            pixel_values = None
 
         return DTrOCRProcessorOutput(
-            pixel_values=image_inputs["pixel_values"] if images is not None else None,
+            pixel_values=pixel_values,
             input_ids=text_inputs['input_ids'] if texts is not None else None,
             attention_mask=text_inputs['attention_mask'] if texts is not None else None,
             labels=text_inputs['input_ids'] if texts is not None and return_labels else None

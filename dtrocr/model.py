@@ -12,6 +12,7 @@ from transformers.models.gpt2.modeling_gpt2 import GPT2Block, GPT2Model
 from transformers.generation.configuration_utils import GenerationConfig
 from transformers.modeling_attn_mask_utils import _prepare_4d_causal_attention_mask_for_sdpa
 from transformers.generation.beam_search import BeamScorer, BeamSearchScorer
+from transformers import AutoModelForVision2Seq  # For Qwen2.5-VL
 from transformers.generation.stopping_criteria import (
     EosTokenCriteria,
     MaxLengthCriteria,
@@ -25,7 +26,15 @@ class DTrOCRModel(nn.Module):
     def __init__(self, config: DTrOCRConfig):
         super().__init__()
         # embeddings
-        self.patch_embeddings = ViTPatchEmbeddings(config)
+        # Load Qwen2.5-VL model and extract its vision encoder
+        qwen_vl_model = AutoModelForVision2Seq.from_pretrained(
+            config.qwen_vl_hf_model,
+            trust_remote_code=True
+        )
+        self.patch_embeddings = qwen_vl_model.vision_model  # Qwen2.5-VL’s ViT encoder
+        for param in self.patch_embeddings.parameters():
+            param.requires_grad = False
+        self.vision_projection = nn.Linear(1280, config.hidden_size)  # Project Qwen2.5-VL output to GPT-2 hidden size
         self.token_embedding = nn.Embedding(config.vocab_size, config.hidden_size)
         self.positional_embedding = nn.Embedding(config.max_position_embeddings, config.hidden_size)
 
@@ -57,7 +66,14 @@ class DTrOCRModel(nn.Module):
         else:
             past_length = past_key_values[0][0].size(-2)
 
-        patch_embeddings = self.patch_embeddings(pixel_values) if past_length == 0 else None
+
+        # Vision encoding with Qwen2.5-VL
+        if past_length == 0:
+            vision_outputs = self.patch_embeddings(pixel_values)  # [batch_size, num_patches, 1280]
+            patch_embeddings = self.vision_projection(vision_outputs.last_hidden_state)  # Project to hidden_size
+        else:
+            patch_embeddings = None
+
         token_embeddings = self.token_embedding(input_ids)
 
         if patch_embeddings is not None:

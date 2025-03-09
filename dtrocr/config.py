@@ -5,14 +5,14 @@ class DTrOCRConfig:
     def __init__(
         self,
         gpt2_hf_model: str = 'openai-community/gpt2',
-        vit_hf_model: str = 'google/vit-base-patch16-224',
+        qwen_vl_hf_model: str = 'Qwen/Qwen2-VL-2B-Instruct',  # Replace ViT with Qwen2.5-VL       
         vocab_size: Optional[int] = 50257,
         max_position_embeddings: Optional[int] = 256,
-        hidden_size: Optional[int] = 768,
+        hidden_size: Optional[int] = 1280,
         num_hidden_layers: Optional[int] = 12,
         num_attention_heads: Optional[int] = 12,
         patch_size: Optional[Union[Tuple[int], List[int]]] = (4, 8),      # (height, width)
-        image_size: Optional[Union[Tuple[int], List[int]]] = (32, 128),   # (height, width)
+        image_size: Optional[Union[Tuple[int], List[int]]] = (224, 224),   # (height, width)
         num_channels: Optional[int] = 3,
         resid_pdrop: Optional[float] = 0.1,
         embd_pdrop: Optional[float] = 0.1,
@@ -21,7 +21,7 @@ class DTrOCRConfig:
         attn_implementation: Literal['sdpa', 'flash_attention_2'] = 'sdpa'
     ):
         self.gpt2_hf_model = gpt2_hf_model
-        self.vit_hf_model = vit_hf_model
+        self.qwen_vl_hf_model = qwen_vl_hf_model
         self.hidden_size = hidden_size
         self.num_hidden_layers = num_hidden_layers
         self.num_attention_heads = num_attention_heads
